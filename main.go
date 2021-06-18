@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -37,7 +40,7 @@ func run() error {
 		case "visit":
 			err := visit(tokens)
 			if err != nil {
-				fmt.Println("Error: ", err.Error())
+				fmt.Println("error: ", err.Error())
 			}
 			continue
 		}
@@ -45,11 +48,21 @@ func run() error {
 	}
 }
 
+// command: visit gemini.circumlunar.space
 func visit(tokens []string) error {
+	geminiPort := 1965
 	dest := strings.Join(tokens[1:], " ")
-	srvAddr := fmt.Sprintf("%v:1965", dest)
+	srvAddr := fmt.Sprintf("%v:%d", dest, geminiPort)
 	fmt.Printf("Attempting to visit --> %v... \n", srvAddr)
-	conn, err := net.Dial("tcp", srvAddr)
+	conf := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true,
+	}
+	conn, err := tls.DialWithDialer(
+		&net.Dialer{Timeout: 15 * time.Second},
+		"tcp",
+		srvAddr,
+		conf)
 	defer func() {
 		err := conn.Close()
 		if err != nil {
@@ -59,18 +72,23 @@ func visit(tokens []string) error {
 	if err != nil {
 		return errors.Wrap(err, "dialing tcp address")
 	}
-	written, err := fmt.Fprintf(conn, "%v\r\n", dest)
+	written, err := fmt.Fprintf(conn, "gemini://%v/\r\n", dest)
 	if err != nil {
 		return errors.Wrap(err, "writing to connection")
 	}
 	fmt.Printf("bytes written to connection: %d\n", written)
-	var resp []byte
-	read, err := conn.Read(resp)
-	if err != nil {
-		return errors.Wrap(err, "read from connection")
+	buffer := make([]byte, 1)
+	var line []byte
+	for {
+		n, err := conn.Read(buffer)
+		if err == io.EOF && n <= 0 {
+			break
+		} else if err != nil && err != io.EOF {
+			return errors.Wrap(err, "read conn")
+		}
+		line = append(line, buffer...)
 	}
-	fmt.Printf("bytes read fromconnection: %d\n", read)
 
-	fmt.Println(string(resp))
+	fmt.Println(string(line))
 	return nil
 }
