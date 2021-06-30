@@ -14,6 +14,7 @@ import (
 )
 
 const prompt = ">"
+const geminiPort = 1965
 
 func main() {
 	if err := run(); err != nil {
@@ -50,12 +51,12 @@ func run() error {
 
 // command: visit gemini.circumlunar.space
 func visit(tokens []string) error {
-	geminiPort := 1965
-	dest := strings.Join(tokens[1:], " ")
-	srvAddr := fmt.Sprintf("%v:%d", dest, geminiPort)
+	destination := strings.Join(tokens[1:], " ")
+	srvAddr := fmt.Sprintf("%v:%d", destination, geminiPort)
 	fmt.Printf("Attempting to visit --> %v... \n", srvAddr)
 	conf := &tls.Config{
-		MinVersion:         tls.VersionTLS12,
+		MinVersion: tls.VersionTLS12,
+		// for the POC, just skip the TLS verification
 		InsecureSkipVerify: true,
 	}
 	conn, err := tls.DialWithDialer(
@@ -63,16 +64,11 @@ func visit(tokens []string) error {
 		"tcp",
 		srvAddr,
 		conf)
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			fmt.Print("could not close tcp connection")
-		}
-	}()
+	defer closeConn(conn)
 	if err != nil {
 		return errors.Wrap(err, "dialing tcp address")
 	}
-	written, err := fmt.Fprintf(conn, "gemini://%v/\r\n", dest)
+	written, err := fmt.Fprintf(conn, "gemini://%v/\r\n", destination)
 	if err != nil {
 		return errors.Wrap(err, "writing to connection")
 	}
@@ -91,4 +87,13 @@ func visit(tokens []string) error {
 
 	fmt.Println(string(line))
 	return nil
+}
+
+func closeConn(conn *tls.Conn) {
+	if conn != nil {
+		err := conn.Close()
+		if err != nil {
+			fmt.Print("could not close tcp connection")
+		}
+	}
 }
