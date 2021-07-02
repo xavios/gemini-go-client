@@ -8,4 +8,4 @@ mod:
 	go mod tidy
 
 live-test:
-	CompileDaemon -build "go clean -cache && go test"
+	CompileDaemon -build "go test -count=1"

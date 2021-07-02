@@ -17,6 +17,7 @@ import (
 const prompt = ">"
 const geminiPort = 1965
 const defaultConncetionTimeout = 15 * time.Second
+const clrf = "\r\n"
 
 func main() {
 	if err := run(); err != nil {
@@ -54,16 +55,15 @@ func run() error {
 // command: visit gemini.circumlunar.space
 func visit(tokens []string) error {
 	destination := strings.Join(tokens[1:], " ")
-	srvAddr := fmt.Sprintf("%v:%d", destination, geminiPort)
-	fmt.Printf("Attempting to visit --> %v... \n", srvAddr)
-
-	conn, err := openConn(srvAddr)
+	url := newUrl(destination)
+	fmt.Printf("Attempting to visit --> %v... \n", url.ServerAddress())
+	conn, err := openConn(url.ServerAddress())
 	if err != nil {
 		return errors.Wrap(err, "dialing tcp address")
 	}
 	defer closeConn(conn)
-	url := fmt.Sprintf("gemini://%v/\r\n", destination)
-	written, err := fmt.Fprint(conn, url)
+	request := fmt.Sprintf("%v%v", url.String(), clrf)
+	written, err := fmt.Fprint(conn, request)
 	if err != nil {
 		return errors.Wrap(err, "writing url to connection")
 	}
@@ -84,7 +84,7 @@ type reader interface {
 func readResponse(r reader) (lines []string, err error) {
 	buff := make([]byte, 1)
 	lineBuff := make([]byte, 0)
-	newLineDelimiter := []byte("\r\n")
+	newLineDelimiter := []byte(clrf)
 	for {
 		readCount, err := r.Read(buff)
 		if err == io.EOF && readCount <= 0 {

@@ -43,5 +43,4 @@ func Test_readResponse(t *testing.T) {
 			require.ElementsMatch(t, tc.wantLines, lines)
 		})
 	}
-
 }
