@@ -55,16 +55,14 @@ func run() error {
 // command: visit gemini.circumlunar.space
 func visit(tokens []string) error {
 	destination := strings.Join(tokens[1:], " ")
-	srvAddr := fmt.Sprintf("%v:%d", destination, geminiPort)
-	fmt.Printf("Attempting to visit --> %v... \n", srvAddr)
-
-	conn, err := openConn(srvAddr)
+	url := newUrl(destination)
+	fmt.Printf("Attempting to visit --> %v... \n", url.ServerAddress())
+	conn, err := openConn(url.ServerAddress())
 	if err != nil {
 		return errors.Wrap(err, "dialing tcp address")
 	}
 	defer closeConn(conn)
-	url := fmt.Sprintf("gemini://%v/", destination)
-	request := fmt.Sprintf("%v%v", url, clrf)
+	request := fmt.Sprintf("%v%v", url.String(), clrf)
 	written, err := fmt.Fprint(conn, request)
 	if err != nil {
 		return errors.Wrap(err, "writing url to connection")
