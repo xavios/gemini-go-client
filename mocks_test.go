@@ -17,6 +17,9 @@ var _ reader = &readerMock{}
 //
 // 		// make and configure a mocked reader
 // 		mockedreader := &readerMock{
+// 			CloseFunc: func() error {
+// 				panic("mock out the Close method")
+// 			},
 // 			ReadFunc: func(bytes []byte) (int, error) {
 // 				panic("mock out the Read method")
 // 			},
@@ -27,18 +30,51 @@ var _ reader = &readerMock{}
 //
 // 	}
 type readerMock struct {
+	// CloseFunc mocks the Close method.
+	CloseFunc func() error
+
 	// ReadFunc mocks the Read method.
 	ReadFunc func(bytes []byte) (int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Close holds details about calls to the Close method.
+		Close []struct {
+		}
 		// Read holds details about calls to the Read method.
 		Read []struct {
 			// Bytes is the bytes argument value.
 			Bytes []byte
 		}
 	}
-	lockRead sync.RWMutex
+	lockClose sync.RWMutex
+	lockRead  sync.RWMutex
+}
+
+// Close calls CloseFunc.
+func (mock *readerMock) Close() error {
+	if mock.CloseFunc == nil {
+		panic("readerMock.CloseFunc: method is nil but reader.Close was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockClose.Lock()
+	mock.calls.Close = append(mock.calls.Close, callInfo)
+	mock.lockClose.Unlock()
+	return mock.CloseFunc()
+}
+
+// CloseCalls gets all the calls that were made to Close.
+// Check the length with:
+//     len(mockedreader.CloseCalls())
+func (mock *readerMock) CloseCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockClose.RLock()
+	calls = mock.calls.Close
+	mock.lockClose.RUnlock()
+	return calls
 }
 
 // Read calls ReadFunc.

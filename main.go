@@ -2,16 +2,12 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 const prompt = ">"
@@ -57,53 +53,21 @@ func visit(tokens []string) error {
 	destination := strings.Join(tokens[1:], " ")
 	url := newUrl(destination)
 	fmt.Printf("Attempting to visit --> %v... \n", url.ServerAddress())
-	conn, err := openConn(url.ServerAddress())
-	if err != nil {
-		return errors.Wrap(err, "dialing tcp address")
-	}
-	defer closeConn(conn)
-	request := fmt.Sprintf("%v%v", url.String(), clrf)
-	written, err := fmt.Fprint(conn, request)
-	if err != nil {
-		return errors.Wrap(err, "writing url to connection")
-	}
-	fmt.Printf("bytes written to connection: %d\n", written)
-	lines, err := readResponse(conn)
+	req := newRequest(
+		withUrl(url),
+		withTimeout(defaultConncetionTimeout),
+	)
+	defer req.Close()
+	conn, err := req.Make()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s", lines)
+	resp, err := conn.ReadResponse()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s\n", resp.body)
 	return nil
-}
-
-//go:generate moq -out mocks_test.go . reader
-type reader interface {
-	Read([]byte) (int, error)
-}
-
-func readResponse(r reader) (lines []string, err error) {
-	buff := make([]byte, 1)
-	lineBuff := make([]byte, 0)
-	newLineDelimiter := []byte(clrf)
-	for {
-		readCount, err := r.Read(buff)
-		if err == io.EOF && readCount <= 0 {
-			break
-		} else if err != nil && err != io.EOF {
-			return nil, errors.Wrap(err, "read conn")
-		}
-		lineBuff = append(lineBuff, buff...)
-		if bytes.HasSuffix(lineBuff, newLineDelimiter) {
-			// write out the line and flush the line buffer
-			lines = append(lines, string(lineBuff[:len(lineBuff)-len(newLineDelimiter)]))
-			lineBuff = make([]byte, 0)
-		}
-	}
-	if len(lineBuff) > 0 {
-		// write out the last line if any
-		lines = append(lines, string(lineBuff))
-	}
-	return lines, nil
 }
 
 func openConn(srvAddr string) (*tls.Conn, error) {

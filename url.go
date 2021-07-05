@@ -45,6 +45,8 @@ func newUrl(urlStr string) url {
 	const defaultScheme = "gemini"
 	const defaultPort = 1965
 
+	var port_string string
+
 	url := url{}
 	url.scheme = getUrlPart(&urlStr, schemeDelim)
 	if url.scheme == "" {
@@ -64,14 +66,19 @@ func newUrl(urlStr string) url {
 			url.address = urlStr
 		}
 	} else {
-		port_string := getUrlPart(&urlStr, portDelim)
+		fmt.Println(urlStr)
+		port_string = getUrlPart(&urlStr, portDelim)
+		if port_string == "" {
+			port_string = urlStr
+		}
 		port, _ := strconv.Atoi(port_string)
 		url.port = port
 	}
 	url.path = getUrlPart(&urlStr, pathDelim)
 	if url.path == "" &&
 		!strings.Contains(urlStr, queryDelim) &&
-		urlStr != url.address {
+		urlStr != url.address &&
+		urlStr != port_string {
 		// at the end only the path remained
 		url.path = urlStr
 	}

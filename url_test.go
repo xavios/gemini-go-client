@@ -77,6 +77,17 @@ func Test_Url(t *testing.T) {
 			},
 			wantStringRepr: "gemini://gemini.conman.org/news.txt",
 		},
+		"address and port": {
+			url: "gemini.conman.org:1965",
+			wantUrl: url{
+				scheme:  "gemini",
+				address: "gemini.conman.org",
+				port:    1965,
+				path:    "",
+				query:   [][]string{},
+			},
+			wantStringRepr: "gemini://gemini.conman.org/",
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
