@@ -1,30 +1,29 @@
 package main
 
 import (
-	"fmt"
 	"io"
-	"net"
-	"net/http"
-	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/pitr/gig"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_communication(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:1965")
-	require.NoError(t, err, "tcp lister creation")
-	ts := httptest.NewUnstartedServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(w, "Hello, client")
-		}))
-	ts.Listener.Close()
-	ts.Listener = l
-	ts.StartTLS()
-	defer ts.Close()
+	const testResponse = "Hello, client"
 
+	g := gig.Default()
+	g.Handle("/", func(c gig.Context) error {
+		return c.Gemini(testResponse)
+	})
+	go g.Run("test/example.crt", "test/example.key")
+	defer g.Close()
+
+	// Wait a bit for gig server, so the request will be served
+	time.Sleep(1 * time.Second)
 	var r *request
-	u := newUrl(ts.URL)
+
+	u := newUrl("localhost:1965")
 	r = newRequest(
 		withUrl(u),
 		withTimeout(defaultConncetionTimeout),
@@ -37,7 +36,7 @@ func Test_communication(t *testing.T) {
 	require.Equal(t, r.timeout, defaultConncetionTimeout)
 
 	var conn *connection
-	conn, err = r.Make()
+	conn, err := r.Make()
 	require.NoError(t, err, "connecting")
 	require.NotNil(t, conn, "connection is nil")
 
@@ -45,26 +44,35 @@ func Test_communication(t *testing.T) {
 	resp, err = conn.ReadResponse()
 	require.NotNil(t, resp, "response is nil")
 	require.NoError(t, err, "reading response")
-	// TODO: bad request - this is an HTTP server not a gemini one
-	// require.ElementsMatch(t, []string{"Hello, client"}, resp.body)
+
+	require.Equal(t, 20, resp.status)
+	require.ElementsMatch(t, []string{testResponse}, resp.body)
 }
 
 func Test_readResponse(t *testing.T) {
 	testCases := map[string]struct {
-		resp      string
-		wantLines []string
+		resp       string
+		wantLines  []string
+		wantHeader string
+		wantStatus int
 	}{
 		"two lines received": {
-			resp:      "This is a line\r\nthis is another",
-			wantLines: []string{"This is a line", "this is another"},
+			resp:       "20 text/gemini\r\nThis is a line\r\nthis is another",
+			wantHeader: "20 text/gemini",
+			wantStatus: 20,
+			wantLines:  []string{"This is a line", "this is another"},
 		},
 		"empty row represented": {
-			resp:      "test\r\n\r\ntest1",
-			wantLines: []string{"test", "", "test1"},
+			resp:       "20 text/gemini\r\ntest\r\n\r\ntest1",
+			wantHeader: "20 text/gemini",
+			wantStatus: 20,
+			wantLines:  []string{"test", "", "test1"},
 		},
 		"line with breakline is handled as a single line": {
-			resp:      "test\r\n",
-			wantLines: []string{"test"},
+			resp:       "20 text/gemini\r\ntest\r\n",
+			wantHeader: "20 text/gemini",
+			wantStatus: 20,
+			wantLines:  []string{"test"},
 		},
 	}
 	for name, tc := range testCases {
@@ -82,8 +90,11 @@ func Test_readResponse(t *testing.T) {
 			}
 			conn := connection{&r}
 			resp, err := conn.ReadResponse()
-			require.NoError(t, err)
+			require.NoError(t, err, "reading response")
+			require.NotNil(t, resp)
 			require.ElementsMatch(t, tc.wantLines, resp.body)
+			require.Equal(t, tc.wantHeader, resp.header)
+			require.Equal(t, tc.wantStatus, resp.status)
 		})
 	}
 }

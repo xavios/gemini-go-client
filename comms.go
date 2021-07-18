@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -77,9 +79,8 @@ func (r *request) Close() error {
 }
 
 type response struct {
-	// TODO
 	status int
-	head   string
+	header string
 	body   []string
 }
 
@@ -109,8 +110,20 @@ func (c *connection) ReadResponse() (*response, error) {
 		}
 		lineBuff = append(lineBuff, buff...)
 		if bytes.HasSuffix(lineBuff, newLineDelimiter) {
-			// write out the line and flush the line buffer
-			resp.body = append(resp.body, string(lineBuff[:len(lineBuff)-len(newLineDelimiter)]))
+			if resp.header == "" {
+				resp.header = string(lineBuff[:len(lineBuff)-len(newLineDelimiter)])
+				headerParts := strings.Split(resp.header, " ")
+				if len(headerParts) > 0 {
+					status, err := strconv.Atoi(headerParts[0])
+					if err != nil {
+						return nil, errors.WithMessage(err, "status is not a number")
+					}
+					resp.status = status
+				}
+			} else {
+				// write out the line and flush the line buffer
+				resp.body = append(resp.body, string(lineBuff[:len(lineBuff)-len(newLineDelimiter)]))
+			}
 			lineBuff = make([]byte, 0)
 		}
 	}
