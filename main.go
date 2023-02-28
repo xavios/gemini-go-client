@@ -12,7 +12,7 @@ import (
 
 const prompt = ">"
 const geminiPort = 1965
-const defaultConncetionTimeout = 15 * time.Second
+const defaultConnectionTimeout = 15 * time.Second
 const clrf = "\r\n"
 
 func main() {
@@ -55,7 +55,7 @@ func visit(tokens []string) error {
 	fmt.Printf("Attempting to visit --> %v... \n", url.ServerAddress())
 	req := newRequest(
 		withUrl(url),
-		withTimeout(defaultConncetionTimeout),
+		withTimeout(defaultConnectionTimeout),
 	)
 	defer req.Close()
 	conn, err := req.Make()
@@ -78,7 +78,7 @@ func openConn(srvAddr string) (*tls.Conn, error) {
 	}
 
 	conn, err := tls.DialWithDialer(
-		&net.Dialer{Timeout: defaultConncetionTimeout},
+		&net.Dialer{Timeout: defaultConnectionTimeout},
 		"tcp",
 		srvAddr,
 		conf)

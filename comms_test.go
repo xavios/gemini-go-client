@@ -26,14 +26,14 @@ func Test_communication(t *testing.T) {
 	u := newUrl("localhost:1965")
 	r = newRequest(
 		withUrl(u),
-		withTimeout(defaultConncetionTimeout),
+		withTimeout(defaultConnectionTimeout),
 	)
 	defer func() {
 		require.NoError(t, r.Close(), "request close")
 	}()
 	require.NotNil(t, r)
 	require.Equal(t, r.url, u)
-	require.Equal(t, r.timeout, defaultConncetionTimeout)
+	require.Equal(t, r.timeout, defaultConnectionTimeout)
 
 	var conn *connection
 	conn, err := r.Make()
